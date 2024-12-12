@@ -1,0 +1,69 @@
+<pre>
+THE NULL POINTER
+================
+{% set fhost_url = url_for("fhost", _external=True).rstrip("/") %}
+HTTP POST files here:
+    curl -F'file=@yourfile.png' {{ fhost_url }}
+You can also POST remote URLs:
+    curl -F'url=http://example.com/image.jpg' {{ fhost_url }}
+If you don't want the resulting URL to be easy to guess:
+    curl -F'file=@yourfile.png' -Fsecret= {{ fhost_url }}
+    curl -F'url=http://example.com/image.jpg' -Fsecret= {{ fhost_url }}
+Or you can shorten URLs:
+    curl -F'shorten=http://example.com/some/long/url' {{ fhost_url }}
+
+It is possible to append your own file name to the URL:
+    {{ fhost_url }}/aaa.jpg/image.jpeg
+
+File URLs are valid for at least 30 days and up to a year (see below).
+Shortened URLs do not expire.
+
+Files can be set to expire sooner by adding an "expires" parameter (in hours)
+    curl -F'file=@yourfile.png' -Fexpires=24 {{ fhost_url }}
+OR by setting "expires" to a timestamp in epoch milliseconds
+    curl -F'file=@yourfile.png' -Fexpires=1681996320000 {{ fhost_url }}
+
+Expired files won't be removed immediately, but will be removed as part of
+the next purge.
+
+Whenever a file that does not already exist or has expired is uploaded,
+the HTTP response header includes an X-Token field. You can use this
+to perform management operations on the file.
+
+To delete the file immediately:
+    curl -Ftoken=token_here -Fdelete= {{ fhost_url }}/abc.txt
+To change the expiration date (see above):
+    curl -Ftoken=token_here -Fexpires=3 {{ fhost_url }}/abc.txt
+
+{% set max_size = config["MAX_CONTENT_LENGTH"]|filesizeformat(True) %}
+Maximum file size: {{ max_size }}
+Not allowed: {{ config["FHOST_MIME_BLACKLIST"]|join(", ") }}
+
+
+FILE RETENTION PERIOD
+---------------------
+
+retention = min_age + (-max_age + min_age) * pow((file_size / max_size - 1), 3)
+
+   days
+ {{'{: 6}'.format(config.get("FHOST_MAX_EXPIRATION", 31536000000)//86400000)}} |  \
+        |   \
+        |    \
+        |     \
+        |      \
+        |       \
+        |        ..
+        |          \
+ {{'{: 6.1f}'.format((config.get("FHOST_MIN_EXPIRATION", 2592000000)/2 + config.get("FHOST_MAX_EXPIRATION", 31536000000)/2)/86400000)}} | ----------..-------------------------------------------
+        |             ..
+        |               \
+        |                ..
+        |                  ...
+        |                     ..
+        |                       ...
+        |                          ....
+        |                              ......
+ {{'{: 6}'.format(config.get("FHOST_MIN_EXPIRATION", 2592000000)//86400000)}} |                                    ....................
+          0{{ ((config["MAX_CONTENT_LENGTH"]/2)|filesizeformat(True)).split(" ")[0].rjust(27) }}{{ max_size.split(" ")[0].rjust(27) }}
+           {{ max_size.split(" ")[1].rjust(54) }}
+</pre>
